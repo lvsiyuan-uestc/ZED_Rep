@@ -1,9 +1,12 @@
 # ZED_Rep
 
+> A practical, reproducible, and script-first implementation of **ZED (Zero-Shot Detection of AI-Generated Images)** with clean CLIs for training, scoring, and threshold tuning.
+
 Reproduction of the paper "Zero-Shot Detection of AI-Generated Images" (ZED) with lightweight PyTorch tooling for training conditional pixel models and evaluating the Δ01 detector used in the publication.
 
 ## Features
 
+- **Refactored evaluation stack** – shared `src/cli_common.py` utilities remove duplicated logic across single-image and batch evaluators, making extensions safer and easier.
 - **Hierarchical pixel heads** – scripts to train level-0 and level-1 conditional logistic heads (`x_0 \mid y_1` and `x_1 \mid y_2`) with either the residual or mixture formulation described in the paper.
 - **Turn-key evaluation utilities** – batch and single-image evaluators that build the multi-scale pyramid, run the trained heads, and report D-scores, Δ01, and |Δ01| with optional visualisations.
 - **Threshold selection helper** – compute ROC statistics and balanced-accuracy operating points from exported CSV score tables to derive production-ready decision thresholds.

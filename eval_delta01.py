@@ -13,41 +13,13 @@ eval_delta01.py — 单图 Δ01 评测（零侵入版，内置按头量纲缩放
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from typing import Dict, Tuple
-import numpy as np
+from typing import Dict
 import torch
-from PIL import Image
 
-
+from src.cli_common import SCALE_PRESETS, apply_affine_all, to_uint8_gray
 from src.eval_core import device_auto, aligned_delta_map_for_visual, _nll_h_d_for_level, load_heads
 from src.utils import load_image_uint8
 from src.pyramid import build_xy_pyramid
-
-SCALE_PRESETS = {
-    "uint8": (1.0, 0.0),
-    "unit":  (1.0/255.0, 0.0),
-    "tanh":  (1.0/127.5, -1.0),
-}
-
-def _apply_affine_pyr(pyr: Dict[str, torch.Tensor], a: float, b: float) -> Dict[str, torch.Tensor]:
-    out = {}
-    for k, v in pyr.items():
-        out[k] = v.to(torch.float32) * a + b
-    return out
-
-def _to_uint8_gray(arr: torch.Tensor, robust: float = 1.0) -> Image.Image:
-    x = arr.detach().cpu().float().numpy()
-    if not np.isfinite(x).any():
-        x = np.zeros_like(x, dtype=np.float32)
-    if 0.5 < robust < 1.0:
-        lo = float(np.quantile(x, 1.0 - robust))
-        hi = float(np.quantile(x, robust))
-    else:
-        lo = float(np.nanmin(x)); hi = float(np.nanmax(x))
-    if not np.isfinite(lo): lo = 0.0
-    if not np.isfinite(hi) or hi <= lo: hi = lo + 1e-6
-    y = np.clip((x - lo) / (hi - lo), 0, 1)
-    return Image.fromarray((y * 255.0 + 0.5).astype(np.uint8), mode="L")
 
 def _calc_for_level(model, device, pyr: Dict[str, torch.Tensor], level: int, pi_temp: float):
     if level == 0: xk, yk1 = "x0", "y1"
@@ -79,8 +51,8 @@ def main():
 
     a1, b1 = SCALE_PRESETS[args.scale1]
     a0, b0 = SCALE_PRESETS[args.scale0]
-    pyr1 = _apply_affine_pyr(pyr_u8, a1, b1)
-    pyr0 = _apply_affine_pyr(pyr_u8, a0, b0)
+    pyr1 = apply_affine_all(pyr_u8, a1, b1)
+    pyr0 = apply_affine_all(pyr_u8, a0, b0)
 
     _, _, D1_map, NLL1m, H1m, D1m = _calc_for_level(m1, device, pyr1, level=1, pi_temp=args.pi_temp1)
     _, _, D0_map, NLL0m, H0m, D0m = _calc_for_level(m0, device, pyr0, level=0, pi_temp=args.pi_temp0)
@@ -92,10 +64,10 @@ def main():
 
     if args.save_maps:
         out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
-        _to_uint8_gray(D1_map, robust=args.robust_vis).save(out / "D1_native.png")
-        _to_uint8_gray(D0_map, robust=args.robust_vis).save(out / "D0_native.png")
+        to_uint8_gray(D1_map, robust=args.robust_vis).save(out / "D1_native.png")
+        to_uint8_gray(D0_map, robust=args.robust_vis).save(out / "D0_native.png")
         Delta_vis = aligned_delta_map_for_visual(D0_map, D1_map, mode="area")
-        _to_uint8_gray(Delta_vis, robust=args.robust_vis).save(out / "Delta01_vis.png")
+        to_uint8_gray(Delta_vis, robust=args.robust_vis).save(out / "Delta01_vis.png")
         print(f"[ok] saved D1_native/D0_native/Delta01_vis to {out}")
 
 if __name__ == "__main__":
