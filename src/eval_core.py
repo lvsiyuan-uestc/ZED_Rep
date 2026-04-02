@@ -12,19 +12,12 @@ import torch.nn.functional as F
 
 
 from .utils import load_image_uint8
+from .cli_common import apply_affine_all
 from .pyramid import build_xy_pyramid
 from .stats import upsample_to, discretized_logistic_logpmf
 from .stats_mix import mixture_loglik_and_resp, expected_H_from_resp
 from .model_head import ResidualLogisticHead
 from .model_head_mix import MixtureLogisticHead
-
-
-def _affine_pyr(pyr, a: float, b: float):
-
-    out = {}
-    for k, v in pyr.items():
-        out[k] = (v.to(torch.float32) * a + b)
-    return out
 
 
 def device_auto() -> torch.device:
@@ -129,8 +122,8 @@ def compute_Ds_for_image(img_path, m1, m0, device,
 
     name1, a1, b1 = scale1
     name0, a0, b0 = scale0
-    pyr1 = _affine_pyr(pyr, a1, b1)
-    pyr0 = _affine_pyr(pyr, a0, b0)
+    pyr1 = apply_affine_all(pyr, a1, b1)
+    pyr0 = apply_affine_all(pyr, a0, b0)
 
     # D1 ← (x1|y2, m1) with scale1
     NLL1, H1, D1_map = _nll_h_d_for_level(pyr1["x1"], pyr1["y2"], m1, device, pi_temp=pi_temp1)
@@ -154,8 +147,8 @@ def compute_Dmaps_for_image(img_path, m1, m0, device,
     pyr = build_xy_pyramid(x0, device="cpu")
     name1, a1, b1 = scale1
     name0, a0, b0 = scale0
-    pyr1 = _affine_pyr(pyr, a1, b1)
-    pyr0 = _affine_pyr(pyr, a0, b0)
+    pyr1 = apply_affine_all(pyr, a1, b1)
+    pyr0 = apply_affine_all(pyr, a0, b0)
 
     _, _, D1_map = _nll_h_d_for_level(pyr1["x1"], pyr1["y2"], m1, device, pi_temp=pi_temp1)
     _, _, D0_map = _nll_h_d_for_level(pyr0["x0"], pyr0["y1"], m0, device, pi_temp=pi_temp0)
